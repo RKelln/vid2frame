@@ -3,13 +3,12 @@ import sys
 import time
 from io import BytesIO
 
-import lmdb
 import h5py
+import lmdb
 import numpy as np
 from PIL import Image
 
 from storage import STORAGE_TYPES
-
 
 if "__main__" == __name__:
     parser = argparse.ArgumentParser()

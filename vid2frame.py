@@ -1,16 +1,19 @@
-import os
-import sys
-import lmdb
-import h5py
-import numpy as np
 import argparse
+import json
+import os
 import shutil
 import subprocess
-import json
+import sys
+import time
 from pathlib import Path
-
-from tqdm import tqdm
 from subprocess import call, check_output
+
+import h5py
+import imagehash
+import lmdb
+import numpy as np
+from PIL import Image
+from tqdm import tqdm
 
 from storage import STORAGE_TYPES
 
@@ -30,8 +33,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("video_path", type=str, help="The video path (single file or dir)")
     # database and file options
-    parser.add_argument("--db_name", type=str, help="The database to store extracted frames")
-    parser.add_argument("--db_type", type=str, choices=["LMDB", "HDF5", "FILE", "PKL"], default="LMDB",
+    parser.add_argument("--db_name", type=str, required=True, help="The database to store extracted frames")
+    parser.add_argument("--db_type", type=str, required=True, choices=["LMDB", "HDF5", "FILE", "PKL"], default="LMDB",
                         help="Type of the database")
     parser.add_argument("--tmp_dir", type=str, default="/tmp", help="Temporary folder")
     # resize options
@@ -42,13 +45,20 @@ def parse_args():
     parser.add_argument("-k", "--skip", type=int, default=1, help="Only store frames with (ID-1) mod skip==0, frame ID starts from 1")
     parser.add_argument("-n", "--num_frame", type=int, default=-1, help="Uniformly sample n frames, this will override --skip")
     parser.add_argument("-r", "--interval", type=float, default=0, help="Extract one frame every r seconds")
-
+    # similarity options
+    parser.add_argument("-d", "--no_duplicates", type=float, default=0, help="Remove duplicates within threshold of another image")
+    parser.add_argument("--hash_size", type=int, default=8, help="For duplicate detection the size the image will be resized to for comparison")
+    parser.add_argument("--hash_alg", type=str, choices=["average_hash", "phash", "dhash", "whash"], default="average_hash")
+    
     args = parser.parse_args()
+
     # sanity check of the options
     if args.short > 0:
         assert args.height == 0 and args.width == 0
     if args.height > 0 or args.width > 0:
         assert args.height > 0 and args.width > 0 and args.short == 0
+    assert(args.no_duplicates >= 0 and args.no_duplicates < 1.0)
+    assert(args.hash_size > 0 and args.hash_size <= 1024)
 
     return args
 
@@ -138,7 +148,14 @@ if "__main__" == __name__:
         assert args.num_frame <= 0 and args.skip == 1, \
                 "No other sampling options are allowed when --interval is set"
 
+    # similarity
+    if args.no_duplicates > 0:
+        similarity_threshold = 1. - args.no_duplicates
+        diff_limit = int(similarity_threshold*(args.hash_size**2))
+        hash_algorithm = eval(f"imagehash.{args.hash_alg}")
+
     # process videos
+    start_time = time.time()
     done_videos = set()
     for vid in tqdm(all_videos, ncols=64):
         video_key = vid.stem
@@ -180,6 +197,19 @@ if "__main__" == __name__:
             sample_ids = set(list(np.linspace(min(ids), max(ids),
                                     args.num_frame, endpoint=True, dtype=np.int32)))
 
+        hashes = []
+        total_files = 0
+        duplicates = 0
+        def detect_duplicate(f:Path) -> bool:
+
+            with Image.open(f) as img:
+                hash1 = imagehash.average_hash(img, args.hash_size).hash
+            for hash2 in hashes:
+                if np.count_nonzero(hash1 != hash2) <= diff_limit:
+                    return True
+            hashes.append(hash1)
+            return False
+
         frame_files = []
         for f in v_dir.iterdir():
             fid = int(f.stem)
@@ -189,13 +219,24 @@ if "__main__" == __name__:
             elif args.skip > 1:
                 if (fid-1) % args.skip != 0:
                     continue
+            total_files += 1
+            # duplicate detection
+            if args.no_duplicates > 0:
+                if detect_duplicate(f):
+                    duplicates +=1
+                    continue
             frame_files.append((fid, f.name))
 
+        frame_files.sort() # sort by fid
         frame_db.put(video_key, v_dir, frame_files)
 
         call(["rm", "-rf", v_dir])
 
         done_videos.add(video_key)
+        if args.no_duplicates > 0:
+            percent = float(duplicates) / float(total_files) * 100.
+            print(f"{video_key}: {duplicates} duplicates removed ({percent:.1f}% of {total_files})")
 
     frame_db.close()
     frame_db.display_info()
+    print(f"Elapsed time: {time.time() - start_time:.1f} seconds")

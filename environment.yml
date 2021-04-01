@@ -43,5 +43,9 @@ dependencies:
   - zlib=1.2.11
   - zstd=1.4.9
   - pip:
+    - imagehash==4.2.0
     - lmdb==1.1.1
+    - pillow-simd==7.0.0.post3
+    - pywavelets==1.1.1
+    - scipy==1.6.2
 prefix: /mnt/large_ssd/music_landscapes/vid2frame/envs

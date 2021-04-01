@@ -40,9 +40,11 @@ pip install -r requirements.txt
 
 ### Extract frames for videos in a specific split using `vid2frame.py`
 ```
-usage: vid2frame.py [-h] [--db_name DB_NAME] [--db_type {LMDB,HDF5,FILE,PKL}]
+usage: vid2frame.py [-h] --db_name DB_NAME --db_type {LMDB,HDF5,FILE,PKL}
                     [--tmp_dir TMP_DIR] [-s SHORT] [-H HEIGHT] [-W WIDTH]
-                    [-k SKIP] [-n NUM_FRAME] [-r INTERVAL]
+                    [-k SKIP] [-n NUM_FRAME] [-r INTERVAL] [-d NO_DUPLICATES]
+                    [--hash_size HASH_SIZE]
+                    [--hash_alg {average_hash,phash,dhash,whash}]
                     video_path
 
 positional arguments:
@@ -66,7 +68,14 @@ optional arguments:
                         Uniformly sample n frames, this will override --skip
   -r INTERVAL, --interval INTERVAL
                         Extract one frame every r seconds
+  -d NO_DUPLICATES, --no_duplicates NO_DUPLICATES
+                        Remove duplicates within threshold of another image
+  --hash_size HASH_SIZE
+                        For duplicate detection the size the image will be
+                        resized to for comparison
+  --hash_alg {average_hash,phash,dhash,whash}
 ```
+
 #### Notes
 * The frames will be stored as strings of their binary content, i.e. they are NOT decoded. Both LMDB and HDF5 are key-value storage, the keys are in the format of `video_name/frame_id` (assuming there are no two videos with the same name).
 * The frames are in JPEG format, with JPEG quality ~95. Note the `-qscale:v 2` option in `vid2frame.py`. This is **important** for subsequent deep learning tasks.
@@ -80,31 +89,32 @@ optional arguments:
     1. Keep one of frame every `k` frames (default 1, i.e. keep every frame) (--skip)
     2. Uniformly sample `n` frames (--num_frame). For example: If there are 10 frames, --skip=2 will sample frames 1,3,5,7,9 and --num_frame=4 will sample frames 1,4,7,10.
     3. Sample one frame every `r` seconds (--interval) or 1/r FPS. For r==1, its 1 FPS, and r==2, its 0.5 FPS.
+* Duplicate removal options:
+    * Requires testing the two parameters: `no_duplicates` and `hash_size` based on video size and frame similarity
+    * For 1920x1080 (HD) video with minimal duplicate removal try `no_duplicates=0.99` and `hash_size=32`
+    * For aggressive HD resolution removal try `no_duplicates=0.98` and `hash_size=8`
+    * Tip: try exporting to FILE type and then using ffmpeg to make a video (at 25 fps):
+        * `ffmpeg path/to/frames/%08d.jpg -r 25 test_frames.mp4`
 * Video files are identified with extensions, currently recognizing `['.mp4', '.avi', '.flv', '.mkv', '.webm', '.mov']`.
 * Videos with the same name (without extension) are considered duplicates. Only one of them will be processed.
 
+### Usage examples
 
-#### Sample usage
-* Extract frame of videos in split-0 generated above:
-
-`python vid2frame.py split-sample.pkl split-0 frames-0.hdf5 HDF5 --short=240`
-
-The output would be:
+#### Basic usage:
 ```
-['split-0', 'split-1'] using split-0
-100%|█████████████████████████████| 1/1 [00:02<00:00,  2.05s/it]
+python vid2frame.py path/to/my/video.mp4 -db_name my_db.lmdb --db_type LMDB
 ```
-You can also process the other split simultaneously, for large video datasets, 6~8-split is recommended for a server with 40 CPUs:
 
-`python vid2frame.py split-sample.pkl split-1 frames-1.hdf5 HDF5 --short=240`
+#### Resize:
+```
+python vid2frame.py path/to/my/video.mp4 -db_name my_frames --db_type FILE -W 512 -H 512
+```
 
-Note that the output databases for different splits should not be the same in case concurrent write is no supported.
+#### Remove duplicates:
+```
+python vid2frame.py path/to/my/video.mp4 -db_name my_frames --db_type FILE -W 512 -H 512 --no_duplicates 0.98 --hash_size 32
+```
 
-More samples:
-
-`python vid2frame.py split-sample.pkl split-0 frames-0.lmdb LMDB --asis`
-
-`python vid2frame.py split-sample.pkl split-0 frames-0.lmdb LMDB -H 240 -W 360`
 
 ### (Optional) Test reading from database using `test_db.py`
 `test_db.py` provides sample code to iterate, read and decode frames in databases, it also checks for broken images. 

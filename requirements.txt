@@ -1,11 +1,6 @@
-certifi==2020.12.5
-h5py @ file:///tmp/build/80754af9/h5py_1593454119955/work
+tqdm==4.58.0
+numpy==1.19.2
+ImageHash==4.2.0
+h5py==3.2.1
 lmdb==1.1.1
-mkl-fft==1.3.0
-mkl-random==1.1.1
-mkl-service==2.3.0
-numpy @ file:///tmp/build/80754af9/numpy_and_numpy_base_1603479632437/work
-olefile==0.46
-Pillow @ file:///tmp/build/80754af9/pillow_1615057347459/work
-six @ file:///tmp/build/80754af9/six_1605205313296/work
-tqdm @ file:///tmp/build/80754af9/tqdm_1615925068909/work
+Pillow==8.1.2
