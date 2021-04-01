@@ -1,0 +1,8 @@
+*.pkl
+*.hdf
+*.hdf5
+*.lmdb
+*.pyc
+*.mdb
+
+envs/
