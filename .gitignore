@@ -5,4 +5,13 @@
 *.pyc
 *.mdb
 
+# envs
 envs/
+stacked_envs/
+
+# vscode
+.vscode
+*.code-workspace
+
+# project
+data/

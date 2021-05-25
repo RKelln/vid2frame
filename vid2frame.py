@@ -46,9 +46,9 @@ def parse_args():
     parser.add_argument("-n", "--num_frame", type=int, default=-1, help="Uniformly sample n frames, this will override --skip")
     parser.add_argument("-r", "--interval", type=float, default=0, help="Extract one frame every r seconds")
     # similarity options
-    parser.add_argument("-d", "--no_duplicates", type=float, default=0, help="Remove duplicates within threshold of another image")
+    parser.add_argument("-d", "--no_duplicates", type=float, default=0, help="Remove duplicates within percentage threshold similarity of another image")
     parser.add_argument("--hash_size", type=int, default=8, help="For duplicate detection the size the image will be resized to for comparison")
-    parser.add_argument("--hash_alg", type=str, choices=["average_hash", "phash", "dhash", "whash"], default="average_hash")
+    parser.add_argument("--hash_alg", type=str, choices=["average_hash", "phash", "dhash", "dhash_vertical", "whash"], default="average_hash")
     
     args = parser.parse_args()
 
@@ -151,17 +151,20 @@ if "__main__" == __name__:
     # similarity
     if args.no_duplicates > 0:
         similarity_threshold = 1. - args.no_duplicates
-        diff_limit = int(similarity_threshold*(args.hash_size**2))
+        diff_limit = round(similarity_threshold * (args.hash_size**2)) # image converted to hash_size x hash_size
         hash_algorithm = eval(f"imagehash.{args.hash_alg}")
 
     # process videos
     start_time = time.time()
     done_videos = set()
-    for vid in tqdm(all_videos, ncols=64):
+    vid_pbar = tqdm(all_videos, desc="video", unit="", ncols=64)
+    for vid in vid_pbar:
         video_key = vid.stem
-
+        
         if video_key in done_videos:
             print(f"video {video_key} seen before, ignored.")
+
+        vid_pbar.set_description(str(vid), refresh=True)
 
         v_dir = args.tmp_dir / video_key
         call(["rm", "-rf", v_dir])
@@ -176,7 +179,7 @@ if "__main__" == __name__:
             select_str = "select=not(mod(n\,%d))" % (int(round(args.interval*r_frame_rate)))
             # if already vf options then add this to them
             if '-vf' in vf_options:
-                vf_index = vf_options.index('vf')
+                vf_index = vf_options.index('-vf')
                 vf_options[vf_index + 1] = vf_options[vf_index + 1] + "," + select_str
             else:
                 vf_options = ["-vf", select_str]
@@ -191,9 +194,9 @@ if "__main__" == __name__:
                 "-qscale:v", "2",
                 str(v_dir / "%8d.jpg")])
 
+        ids = [int(f.stem) for f in v_dir.iterdir()]
         sample = (args.num_frame > 0)
         if sample:
-            ids = [int(f.stem) for f in v_dir.iterdir()]
             sample_ids = set(list(np.linspace(min(ids), max(ids),
                                     args.num_frame, endpoint=True, dtype=np.int32)))
 
@@ -203,15 +206,15 @@ if "__main__" == __name__:
         def detect_duplicate(f:Path) -> bool:
 
             with Image.open(f) as img:
-                hash1 = imagehash.average_hash(img, args.hash_size).hash
+                hash1 = hash_algorithm(img, args.hash_size)
             for hash2 in hashes:
-                if np.count_nonzero(hash1 != hash2) <= diff_limit:
+                if hash1 - hash2 <= diff_limit:
                     return True
             hashes.append(hash1)
             return False
 
         frame_files = []
-        for f in v_dir.iterdir():
+        for f in tqdm(v_dir.iterdir(), desc="frame", unit="", total=len(ids), ncols=64):
             fid = int(f.stem)
             if sample:
                 if fid not in sample_ids:
