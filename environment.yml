@@ -1,4 +1,4 @@
-name: /mnt/large_ssd/music_landscapes/vid2frame/envs
+name: vid2frame
 channels:
   - defaults
 dependencies:
@@ -48,4 +48,3 @@ dependencies:
     - pillow-simd==7.0.0.post3
     - pywavelets==1.1.1
     - scipy==1.6.2
-prefix: /mnt/large_ssd/music_landscapes/vid2frame/envs
