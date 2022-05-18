@@ -1,6 +1,9 @@
 # vid2frame
 An easy-to-use tool to extract frames from video and store into database.
-Basically, this is a python wrapper of ffmpeg which additionally stores the frames into database.
+Basically, this is a python wrapper of ffmpeg which additionally stores the frames into database. 
+Additionally, some basic capabilities for detecting duplicates and deduplication has been added
+such that you can quite easily extract 100 different frames from a video, or if you scrape
+a large number of images from the net you can resize and dedupe before placing them into an image database.
 
 ## This is based on others work
 
