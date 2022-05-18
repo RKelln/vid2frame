@@ -102,17 +102,17 @@ optional arguments:
 
 #### Basic usage:
 ```
-python vid2frame.py path/to/my/video.mp4 -db_name my_db.lmdb --db_type LMDB
+python vid2frame.py path/to/my/video.mp4 --db_name my_db.lmdb --db_type LMDB
 ```
 
 #### Resize:
 ```
-python vid2frame.py path/to/my/video.mp4 -db_name my_frames --db_type FILE -W 512 -H 512
+python vid2frame.py path/to/my/video.mp4 --db_name my_frames --db_type FILE -W 512 -H 512
 ```
 
 #### Remove duplicates:
 ```
-python vid2frame.py path/to/my/video.mp4 -db_name my_frames --db_type FILE -W 512 -H 512 --no_duplicates 0.98 --hash_size 32
+python vid2frame.py path/to/my/video.mp4 --db_name my_frames --db_type FILE -W 512 -H 512 --no_duplicates 0.98 --hash_size 32
 ```
 
 
